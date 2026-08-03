@@ -82,7 +82,7 @@ With no options (a plain `"@foae/opencode-timings@latest"` string), it defaults 
 
 ## Development
 
-Built and run with [Bun](https://bun.sh). The package ships raw source — there is no build step; OpenCode loads `src/tui.tsx` directly.
+Built and run with [Bun](https://bun.sh).
 
 - `src/timing.ts` — pure timing math, formatting, and config parsing (no JSX), unit-tested.
 - `src/tui.tsx` — the SolidJS sidebar component and the slot registration.
@@ -91,7 +91,17 @@ Built and run with [Bun](https://bun.sh). The package ships raw source — there
 bun install
 bun run typecheck   # tsc --noEmit
 bun test            # unit tests for the pure logic in src/timing.ts
+bun run build       # compile src/ to dist/ with babel-preset-solid
 ```
+
+The package ships `dist/tui.js`, pre-compiled with `babel-preset-solid`
+(universal renderer, `moduleName: "@opentui/solid"`). Shipping raw `.tsx` no
+longer works: OpenCode installs plugins under a `node_modules` path, and since
+`@opentui/solid` 0.4.x the host's Solid JSX transform skips `node_modules`, so
+raw JSX gets compiled by Bun's plain (non-reactive) JSX runtime and the panel
+renders once and never updates. The compiled output imports bare
+`@opentui/solid` / `solid-js` specifiers, which the host maps onto its own
+shared runtime instances.
 
 `opentui`, `solid-js`, and the OpenCode plugin/SDK are **peer dependencies** — at runtime they come from the OpenCode host so the plugin shares its renderer; the `devDependencies` mirror them for local typecheck and tests.
 
