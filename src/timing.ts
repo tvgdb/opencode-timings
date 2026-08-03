@@ -13,6 +13,19 @@
  *   - turns    number of completed assistant messages, plus the average duration.
  *   - slowest  the single slowest assistant message.
  *   - durations per-turn durations, fed to the sparkline.
+ *   - tokensIn / tokensOut  totals over the same completed turns: what the model
+ *              read (input + cache read/write) vs generated (output + reasoning).
+ *   - avgTps   session-average generation speed: tokensOut over api time.
+ *   - lastTps  the most recent turn's tokens/s.
+ *   - tpsPerTurn per-turn tokens/s, fed to the speed sparkline.
+ *
+ * Idle time: nothing here reads the clock — every value derives from message
+ * timestamps, so idling between turns or leaving a session open moves only
+ * wall (and therefore apiPct), which exist precisely to show that contrast.
+ * The one leak is *inside* a turn: (completed - created) includes tool
+ * execution and any wait on the user (permission prompts, questions), which
+ * inflates api/avg/slowest and deflates tok/s for that turn. Message-level
+ * timestamps cannot separate it; part-level timing is not in the TUI state.
  */
 import type { Message } from "@opencode-ai/sdk/v2"
 
@@ -24,8 +37,9 @@ export const SPARK_LEVELS = "▁▂▃▄▅▆▇█"
 
 export type Mode = "fancy" | "simple"
 // Each field toggles exactly one displayed value. `ratio` is the api/wall gauge
-// (the panel's headline metric); `sparkline` is fancy-only. Order matches the
-// top-to-bottom render order.
+// (the panel's headline metric); `sparkline` (per-turn durations) and
+// `speedline` (per-turn tok/s) are fancy-only. Order matches the top-to-bottom
+// render order.
 export type Fields = {
   ratio: boolean
   api: boolean
@@ -33,7 +47,12 @@ export type Fields = {
   turns: boolean
   avg: boolean
   slow: boolean
+  tps: boolean
+  lastTps: boolean
+  tokIn: boolean
+  tokOut: boolean
   sparkline: boolean
+  speedline: boolean
 }
 export const DEFAULT_FIELDS: Fields = {
   ratio: true,
@@ -42,7 +61,12 @@ export const DEFAULT_FIELDS: Fields = {
   turns: true,
   avg: true,
   slow: true,
+  tps: true,
+  lastTps: true,
+  tokIn: true,
+  tokOut: true,
   sparkline: true,
+  speedline: true,
 }
 
 export type Timing = {
@@ -53,15 +77,39 @@ export type Timing = {
   slowestMs: number
   apiPct: number
   durations: number[]
+  tokensIn: number
+  tokensOut: number
+  avgTps: number
+  lastTps: number
+  tpsPerTurn: number[]
 }
-export const EMPTY: Timing = { apiMs: 0, wallMs: 0, turns: 0, avgMs: 0, slowestMs: 0, apiPct: 0, durations: [] }
+export const EMPTY: Timing = {
+  apiMs: 0,
+  wallMs: 0,
+  turns: 0,
+  avgMs: 0,
+  slowestMs: 0,
+  apiPct: 0,
+  durations: [],
+  tokensIn: 0,
+  tokensOut: 0,
+  avgTps: 0,
+  lastTps: 0,
+  tpsPerTurn: [],
+}
+
+// Token counts can be absent on old/partial records despite the SDK type.
+const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0)
 
 export function computeTiming(messages: ReadonlyArray<Message>): Timing {
   let apiMs = 0
   let slowestMs = 0
   let minTs = Number.POSITIVE_INFINITY
   let maxTs = 0
+  let tokensIn = 0
+  let tokensOut = 0
   const durations: number[] = []
+  const tpsPerTurn: number[] = []
 
   for (const msg of messages) {
     const created = msg.time?.created
@@ -78,6 +126,11 @@ export function computeTiming(messages: ReadonlyArray<Message>): Timing {
           apiMs += dur
           durations.push(dur)
           if (dur > slowestMs) slowestMs = dur
+          const tok = msg.tokens
+          const outTok = num(tok?.output) + num(tok?.reasoning)
+          tokensIn += num(tok?.input) + num(tok?.cache?.read) + num(tok?.cache?.write)
+          tokensOut += outTok
+          tpsPerTurn.push((outTok * 1000) / dur)
         }
       }
     }
@@ -97,6 +150,11 @@ export function computeTiming(messages: ReadonlyArray<Message>): Timing {
     // (the gauge bar clamps too) to keep the percent honest.
     apiPct: wallMs > 0 ? Math.min(100, Math.round((apiMs / wallMs) * 100)) : 0,
     durations,
+    tokensIn,
+    tokensOut,
+    avgTps: (tokensOut * 1000) / apiMs,
+    lastTps: tpsPerTurn[tpsPerTurn.length - 1] ?? 0,
+    tpsPerTurn,
   }
 }
 
@@ -109,6 +167,29 @@ export function fmtDuration(ms: number): string {
   if (totalMin < 60) return `${totalMin}m${String(totalSec % 60).padStart(2, "0")}s`
   const hours = Math.floor(totalMin / 60)
   return `${hours}h${String(totalMin % 60).padStart(2, "0")}m`
+}
+
+/** Compact token count: "950", "1.2k", "45k", "1.2M". */
+export function fmtTokens(n: number): string {
+  if (!Number.isFinite(n) || n < 0) n = 0
+  for (const [div, unit] of [
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "k"],
+  ] as const) {
+    if (n >= div) {
+      const v = n / div
+      // >= 9.95 so toFixed(1) never prints a four-char "10.0".
+      return v >= 9.95 ? `${Math.round(v)}${unit}` : `${v.toFixed(1)}${unit}`
+    }
+  }
+  return String(Math.round(n))
+}
+
+/** Tokens-per-second: one decimal below 10 ("7.5"), whole numbers above ("43"). */
+export function fmtTps(tps: number): string {
+  if (!Number.isFinite(tps) || tps <= 0) return "0"
+  return tps >= 9.95 ? String(Math.round(tps)) : tps.toFixed(1)
 }
 
 export function bar(pct: number, width: number): string {
@@ -160,9 +241,29 @@ export function buildRows(t: Timing, mode: Mode, fields: Fields): string[] {
 
   if (fields.slow) rows.push(`slowest ${fmtDuration(t.slowestMs)}`)
 
+  // In both packed rows below, the leading label ("tok/s" / "tok") moves onto
+  // the second segment when it stands alone, so the row stays self-labeling
+  // whichever value is enabled.
+  const tpsRow = packRow(
+    fields.tps ? `tok/s avg ${fmtTps(t.avgTps)}` : "",
+    fields.lastTps ? `${fields.tps ? "last" : "tok/s last"} ${fmtTps(t.lastTps)}` : "",
+  )
+  if (tpsRow) rows.push(tpsRow)
+
+  const tokensRow = packRow(
+    fields.tokIn ? `tok in ${fmtTokens(t.tokensIn)}` : "",
+    fields.tokOut ? `${fields.tokIn ? "out" : "tok out"} ${fmtTokens(t.tokensOut)}` : "",
+  )
+  if (tokensRow) rows.push(tokensRow)
+
   if (mode === "fancy" && fields.sparkline) {
     const spark = sparkline(t.durations)
     if (spark) rows.push(`per-turn ${spark}`)
+  }
+
+  if (mode === "fancy" && fields.speedline) {
+    const spark = sparkline(t.tpsPerTurn)
+    if (spark) rows.push(`speed ${spark}`)
   }
 
   return rows

@@ -17,7 +17,10 @@ api/wall ██████░░ 78%
 api 31s · wall 40s
 turns 4 · avg 8s
 slowest 19s
+tok/s avg 43 · last 51
+tok in 1.2M · out 45k
 per-turn ▄█▂▂
+speed ▂▄█▆
 ```
 
 Every row names itself, so there are no unlabeled numbers or glyphs to decode.
@@ -31,9 +34,20 @@ Every row names itself, so there are no unlabeled numbers or glyphs to decode.
 | `wall`     | Span from the first to the last message timestamp. Includes the time you spend reading/typing between turns, so `api` is always a fraction of it. |
 | `turns`    | Number of completed assistant messages, plus the average per-turn duration. |
 | `slowest`  | The single slowest assistant message. |
+| `tok/s`    | Generation speed: tokens the model generated (output + reasoning) over `api` time — `avg` across the session, `last` for the most recent turn. |
+| `tok in` / `out` | Total tokens the model read (input + cache read/write) vs generated (output + reasoning), across completed turns. |
 | `per-turn` | Sparkline of each recent turn's duration. |
+| `speed`    | Sparkline of each recent turn's tok/s. |
 
 The panel is always shown; before the first turn its values read zero.
+
+A note on honesty: no metric reads the clock — everything derives from message
+timestamps, so idling between turns (or leaving a session open) moves only
+`wall` and the `api/wall` ratio, which exist precisely to show that contrast.
+The one thing timestamps can't separate is time *inside* a turn: a turn's span
+(`completed − created`) includes tool execution and any wait on you (permission
+prompts, questions), so on such turns `api` reads high and `tok/s` reads low —
+it's the *effective* speed you experienced, not the model's raw decode speed.
 
 ## Install
 
@@ -63,7 +77,11 @@ Pass options using the tuple form (`[spec, options]`) in `tui.json`:
   "plugin": [
     ["@foae/opencode-timings@latest", {
       "mode": "fancy",
-      "fields": { "ratio": true, "api": true, "wall": true, "turns": true, "avg": true, "slow": true, "sparkline": true }
+      "fields": {
+        "ratio": true, "api": true, "wall": true, "turns": true, "avg": true, "slow": true,
+        "tps": true, "lastTps": true, "tokIn": true, "tokOut": true,
+        "sparkline": true, "speedline": true
+      }
     }]
   ]
 }
@@ -71,8 +89,8 @@ Pass options using the tuple form (`[spec, options]`) in `tui.json`:
 
 | Option   | Values | Default | Meaning |
 |----------|--------|---------|---------|
-| `mode`   | `"fancy"` \| `"simple"` | `"fancy"` | `fancy` draws the gauge bar on the `api/wall` row and adds the per-turn sparkline; `simple` is the same rows without the bar or sparkline. |
-| `fields` | object of booleans | all `true` | Each toggles exactly one value: `ratio` (the `api/wall` gauge + percent), `api`, `wall`, `turns`, `avg`, `slow`, `sparkline` (`sparkline` is fancy-only). Values that share a line drop out individually. |
+| `mode`   | `"fancy"` \| `"simple"` | `"fancy"` | `fancy` draws the gauge bar on the `api/wall` row and adds the two sparklines; `simple` is the same rows without the bar or sparklines. |
+| `fields` | object of booleans | all `true` | Each toggles exactly one value: `ratio` (the `api/wall` gauge + percent), `api`, `wall`, `turns`, `avg`, `slow`, `tps` (session-average tok/s), `lastTps` (latest turn's tok/s), `tokIn`, `tokOut`, `sparkline` (per-turn durations), `speedline` (per-turn tok/s) — the last two are fancy-only. Values that share a line drop out individually. |
 
 With no options (a plain `"@foae/opencode-timings@latest"` string), it defaults to `fancy` mode with all fields shown.
 

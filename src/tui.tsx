@@ -14,7 +14,10 @@
  *   api 31s · wall 40s          the two raw times behind that ratio
  *   turns 4 · avg 8s            completed assistant turns and their average
  *   slowest 19s                 the single slowest turn
+ *   tok/s avg 43 · last 51      generation speed: session average and latest turn
+ *   tok in 1.2M · out 45k       tokens the model read vs generated
  *   per-turn ▄█▂▂               sparkline of each recent turn's duration
+ *   speed ▂▄█▆                  sparkline of each recent turn's tok/s
  *
  * The timing math, formatting, and config parsing live in `./timing.ts` (pure,
  * JSX-free, unit-tested); this file is just the Solid component and the slot
@@ -27,14 +30,16 @@
  *       "mode": "fancy",            // "fancy" (default) | "simple"
  *       "fields": {                  // each toggles one value, all default true
  *         "ratio": true, "api": true, "wall": true, "turns": true,
- *         "avg": true, "slow": true, "sparkline": true
+ *         "avg": true, "slow": true, "tps": true, "lastTps": true,
+ *         "tokIn": true, "tokOut": true, "sparkline": true, "speedline": true
  *       }
  *     }]
  *   ]
  *
- * "fancy" draws the gauge bar on the ratio row and adds a sparkline of recent
- * turn durations; "simple" is the same rows without the bar or sparkline. The
- * panel is always shown (values read zero before the first turn).
+ * "fancy" draws the gauge bar on the ratio row and adds the two sparklines
+ * (turn durations and per-turn tok/s); "simple" is the same rows without the
+ * bar or sparklines. The panel is always shown (values read zero before the
+ * first turn).
  */
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@opencode-ai/plugin/tui"
 import { createEffect, createSignal, Index, onCleanup } from "solid-js"
