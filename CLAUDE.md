@@ -1,6 +1,6 @@
-# CLAUDE.md
+# opencode-timings
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI coding agents working with code in this repository.
 
 ## What this is
 
