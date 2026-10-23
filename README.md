@@ -51,38 +51,47 @@ it's the *effective* speed you experienced, not the model's raw decode speed.
 
 ## Install
 
-Add it to the `plugin` array of the **TUI** config that OpenCode loads
-(`~/.config/opencode/tui.json` or `tui.jsonc`) — this is a TUI plugin, so it
-belongs in `tui.json`, not `opencode.json`:
+Add it to the `plugins` array of the **CLI** config that OpenCode loads
+(`~/.config/opencode/cli.json`) — this is a CLI/TUI plugin, so it belongs in
+`cli.json`, not `opencode.json`:
 
-```jsonc
+```json
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["@foae/opencode-timings@latest"]
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": ["@foae/opencode-timings@latest"]
 }
+```
+
+Or install it via the OpenCode CLI:
+
+```sh
+opencode plugin add github:foae/opencode-timings
 ```
 
 OpenCode installs the plugin and its dependencies with Bun at startup. Restart
 OpenCode and open the session sidebar to see the `Timing` panel.
 
-You can also pin a version, e.g. `@foae/opencode-timings@0.1.2`.
+You can also pin a version, e.g. `@foae/opencode-timings@0.4.0`.
 
 ## Configuration
 
-Pass options using the tuple form (`[spec, options]`) in `tui.json`:
+Pass options using the `{ "package": ..., "options": ... }` object form in `cli.json`:
 
-```jsonc
+```json
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [
-    ["@foae/opencode-timings@latest", {
-      "mode": "fancy",
-      "fields": {
-        "ratio": true, "api": true, "wall": true, "turns": true, "avg": true, "slow": true,
-        "tps": true, "lastTps": true, "tokIn": true, "tokOut": true,
-        "sparkline": true, "speedline": true
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": [
+    {
+      "package": "@foae/opencode-timings@latest",
+      "options": {
+        "mode": "fancy",
+        "fields": {
+          "ratio": true, "api": true, "wall": true, "turns": true, "avg": true, "slow": true,
+          "tps": true, "lastTps": true, "tokIn": true, "tokOut": true,
+          "sparkline": true, "speedline": true
+        }
       }
-    }]
+    }
   ]
 }
 ```
@@ -96,7 +105,7 @@ With no options (a plain `"@foae/opencode-timings@latest"` string), it defaults 
 
 ## Requirements
 
-- OpenCode `1.15.x` or newer (uses the TUI slot plugin API).
+- OpenCode `2.x` (uses the OpenCode v2 CLI plugin API `@opencode/plugin/tui`).
 
 ## Development
 

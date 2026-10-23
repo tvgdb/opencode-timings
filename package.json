@@ -50,20 +50,20 @@
     "prepublishOnly": "bun run typecheck && bun run test && bun run build"
   },
   "peerDependencies": {
-    "@opencode-ai/plugin": "^1.15.0",
-    "@opentui/core": ">=0.2.16",
-    "@opentui/solid": ">=0.2.16",
-    "solid-js": "^1.9.12"
+    "@opencode/plugin": "latest",
+    "@opentui/core": ">=0.6.6",
+    "@opentui/solid": ">=0.6.6",
+    "solid-js": ">=1.9.0"
   },
   "devDependencies": {
     "@babel/core": "^7.26.0",
     "@babel/preset-typescript": "^7.26.0",
     "@types/babel__core": "^7.20.5",
     "babel-preset-solid": "^1.9.3",
-    "@opencode-ai/plugin": "^1.15.0",
-    "@opencode-ai/sdk": "^1.15.0",
-    "@opentui/core": "^0.3.1",
-    "@opentui/solid": "^0.3.1",
+    "@opencode/client": "latest",
+    "@opencode/plugin": "latest",
+    "@opentui/core": "^0.6.6",
+    "@opentui/solid": "^0.6.6",
     "@types/bun": "^1.1.0",
     "@types/node": "^22.0.0",
     "solid-js": "1.9.12",

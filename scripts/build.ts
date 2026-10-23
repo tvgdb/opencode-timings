@@ -41,7 +41,7 @@ const timing = await compile("timing.ts", false)
 // runtime — fail the publish if either property is missing.
 if (/<(box|text|Index)\b/.test(tui)) throw new Error("dist/tui.js still contains raw JSX")
 if (!tui.includes(`from "@opentui/solid"`)) throw new Error("dist/tui.js does not import the @opentui/solid runtime")
-if (timing.includes("@opencode-ai")) throw new Error("dist/timing.js retained the type-only SDK import")
+if (timing.includes("@opencode")) throw new Error("dist/timing.js retained a type-only SDK import")
 
 rmSync(`${root}dist`, { recursive: true, force: true })
 mkdirSync(`${root}dist`)

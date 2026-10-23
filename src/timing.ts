@@ -27,7 +27,23 @@
  * inflates api/avg/slowest and deflates tok/s for that turn. Message-level
  * timestamps cannot separate it; part-level timing is not in the TUI state.
  */
-import type { Message } from "@opencode-ai/sdk/v2"
+export type TimingMessage = {
+  type?: string
+  role?: string
+  time?: {
+    created?: number
+    completed?: number
+  }
+  tokens?: {
+    input?: number
+    output?: number
+    reasoning?: number
+    cache?: {
+      read?: number
+      write?: number
+    }
+  }
+}
 
 // Narrower than the simple-mode rows so the "api/wall" label + gauge + percent
 // fit one sidebar line without wrapping.
@@ -101,7 +117,7 @@ export const EMPTY: Timing = {
 // Token counts can be absent on old/partial records despite the SDK type.
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0)
 
-export function computeTiming(messages: ReadonlyArray<Message>): Timing {
+export function computeTiming(messages: ReadonlyArray<TimingMessage>): Timing {
   let apiMs = 0
   let slowestMs = 0
   let minTs = Number.POSITIVE_INFINITY
@@ -117,7 +133,7 @@ export function computeTiming(messages: ReadonlyArray<Message>): Timing {
       if (created < minTs) minTs = created
       if (created > maxTs) maxTs = created
     }
-    if (msg.role === "assistant") {
+    if (msg.type === "assistant" || msg.role === "assistant") {
       const completed = msg.time?.completed
       if (typeof completed === "number") {
         if (completed > maxTs) maxTs = completed

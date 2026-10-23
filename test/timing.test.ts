@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import type { Message } from "@opencode-ai/sdk/v2"
 import {
   bar,
   buildRows,
@@ -14,28 +13,27 @@ import {
   sparkline,
   SPARK_POINTS,
   type Timing,
+  type TimingMessage,
 } from "../src/timing.ts"
 
-// computeTiming only reads role, time.{created,completed}, and tokens; build
+// computeTiming only reads type/role, time.{created,completed}, and tokens; build
 // minimal message-shaped objects rather than full SDK Message instances.
 type Tok = { input?: number; output?: number; reasoning?: number; cacheRead?: number; cacheWrite?: number }
-const asst = (created: number | undefined, completed: number | undefined, tok?: Tok): Message =>
-  ({
-    role: "assistant",
-    time: { created, completed },
-    ...(tok
-      ? {
-          tokens: {
-            input: tok.input ?? 0,
-            output: tok.output ?? 0,
-            reasoning: tok.reasoning ?? 0,
-            cache: { read: tok.cacheRead ?? 0, write: tok.cacheWrite ?? 0 },
-          },
-        }
-      : {}),
-  }) as unknown as Message
-const user = (created: number | undefined): Message =>
-  ({ role: "user", time: { created } }) as unknown as Message
+const asst = (created: number | undefined, completed: number | undefined, tok?: Tok): TimingMessage => ({
+  type: "assistant",
+  time: { created, completed },
+  ...(tok
+    ? {
+        tokens: {
+          input: tok.input ?? 0,
+          output: tok.output ?? 0,
+          reasoning: tok.reasoning ?? 0,
+          cache: { read: tok.cacheRead ?? 0, write: tok.cacheWrite ?? 0 },
+        },
+      }
+    : {}),
+})
+const user = (created: number | undefined): TimingMessage => ({ type: "user", time: { created } })
 
 // All fields on, with optional per-test overrides — robust to future fields.
 const fields = (overrides: Partial<Fields> = {}): Fields => ({ ...DEFAULT_FIELDS, ...overrides })
@@ -149,6 +147,27 @@ describe("computeTiming", () => {
     ])
     expect(t.tokensOut).toBe(100)
     expect(t.tpsPerTurn).toEqual([100])
+  })
+
+  test("v2 type: 'assistant' and legacy role: 'assistant' messages compute identical timings", () => {
+    const v2Messages: TimingMessage[] = [
+      user(1000),
+      asst(2000, 5000, { input: 100, output: 300, reasoning: 50, cacheRead: 500, cacheWrite: 25 }),
+    ]
+    const v1Messages: TimingMessage[] = [
+      { role: "user", time: { created: 1000 } },
+      {
+        role: "assistant",
+        time: { created: 2000, completed: 5000 },
+        tokens: {
+          input: 100,
+          output: 300,
+          reasoning: 50,
+          cache: { read: 500, write: 25 },
+        },
+      },
+    ]
+    expect(computeTiming(v2Messages)).toEqual(computeTiming(v1Messages))
   })
 })
 
