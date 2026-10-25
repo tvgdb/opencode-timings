@@ -46,14 +46,28 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "build": "bun run scripts/build.ts",
-    "prepublishOnly": "bun run typecheck && bun run test && bun run build"
+    "compile": "bun run scripts/build.ts",
+    "prepublishOnly": "bun run typecheck && bun run test && bun run compile"
   },
   "peerDependencies": {
     "@opencode/plugin": "latest",
     "@opentui/core": ">=0.6.6",
     "@opentui/solid": ">=0.6.6",
     "solid-js": ">=1.9.0"
+  },
+  "peerDependenciesMeta": {
+    "@opencode/plugin": {
+      "optional": true
+    },
+    "@opentui/core": {
+      "optional": true
+    },
+    "@opentui/solid": {
+      "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@babel/core": "^7.26.0",

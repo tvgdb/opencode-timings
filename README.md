@@ -118,7 +118,7 @@ Built and run with [Bun](https://bun.sh).
 bun install
 bun run typecheck   # tsc --noEmit
 bun test            # unit tests for the pure logic in src/timing.ts
-bun run build       # compile src/ to dist/ with babel-preset-solid
+bun run compile     # compile src/ to dist/ with babel-preset-solid
 ```
 
 The package ships `dist/tui.js`, pre-compiled with `babel-preset-solid`

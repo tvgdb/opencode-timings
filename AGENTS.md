@@ -10,10 +10,10 @@ An [OpenCode](https://opencode.ai) **CLI/TUI plugin** that renders a `Timing` pa
 
 - `bun run typecheck` — `tsc --noEmit` over `src` and `test`.
 - `bun test` — runs the unit tests in `test/` (Bun's built-in runner). A single file: `bun test test/timing.test.ts`; a single case: `bun test -t "<name substring>"`.
-- `bun run build` — `scripts/build.ts`: compiles `src/` to `dist/` with babel-preset-solid (see Packaging).
-- `bun run prepublishOnly` — typecheck + test + build; the publish gate. Runs automatically on `npm/bun publish`.
+- `bun run compile` — `scripts/build.ts`: compiles `src/` to `dist/` with babel-preset-solid (see Packaging).
+- `bun run prepublishOnly` — typecheck + test + compile; the publish gate. Runs automatically on `npm/bun publish`.
 
-The package ships **compiled** `dist/tui.js`/`dist/timing.js` (see `files` + `exports` in `package.json`); `exports["./tui"]` points at `dist/tui.js`. Runtime is Bun, not Node. Typecheck + tests are the local gates. End-to-end verification IS possible on this machine: drive `opencode` inside `tmux` (`tmux new-session -d -s x 'cd <scratch-dir> && opencode'`, `tmux send-keys`, `tmux capture-pane -p`) after copying a freshly built `dist/` into the installed cache at `~/.cache/opencode/packages/@foae/opencode-timings@latest/node_modules/@foae/opencode-timings/`.
+The package ships **compiled** `dist/tui.js`/`dist/timing.js` (see `files` + `exports` in `package.json`); `exports["./tui"]` points at `dist/tui.js`. Runtime is Bun, not Node. Typecheck + tests are the local gates. End-to-end verification IS possible on this machine: drive `opencode` inside `tmux` (`tmux new-session -d -s x 'cd <scratch-dir> && opencode'`, `tmux send-keys`, `tmux capture-pane -p`) after copying a freshly built `dist/` into the installed cache under `~/.cache/opencode/npm/`.
 
 ## Architecture
 
@@ -43,9 +43,10 @@ Key facts that aren't obvious from a single read:
 
 ## Packaging
 
-- **Ship compiled `dist/`, never raw `.tsx`.** OpenCode installs npm plugins under `~/.cache/opencode/packages/<spec>/node_modules/...`, and since `@opentui/solid` 0.4.x the host's Solid JSX transform has a filter that **excludes `node_modules`** — raw `.tsx` falls back to Bun's plain automatic JSX runtime, which evaluates `{expr}` children eagerly exactly once: the panel renders its mount-time snapshot (all zeros) and never updates, with no error anywhere. `scripts/build.ts` therefore pre-compiles with `babel-preset-solid` (`generate: "universal"`, `moduleName: "@opentui/solid"` — the same preset+options the host's own transform uses) and asserts the output is JSX-free and imports the `@opentui/solid` runtime. This matches how other working TUI plugins (e.g. `@slkiser/opencode-quota`) ship.
-- **Bare `@opentui/solid` / `solid-js` / `@opencode/plugin/tui` imports in `dist` are mapped to the host's instances at load time** by OpenCode's runtime resolver, so the compiled code shares the host's reactive runtime even though npm also installs local copies of the peers into the plugin's `node_modules`.
-- **`@opencode/plugin`, `@opentui/core`, `@opentui/solid`, `solid-js` are `peerDependencies`** (with `devDependencies` mirrors for typecheck/test/build). Keep the peer ranges aligned with the host (`@opentui/* >= 0.6.6`, `solid-js >= 1.9.0`). Do not move these to `dependencies` (forks the Solid/opentui runtime).
+- **Ship compiled `dist/`, never raw `.tsx`.** OpenCode installs npm and git plugins under `~/.cache/opencode/npm/<id>/<rev>/node_modules/...`, and since `@opentui/solid` 0.4.x the host's Solid JSX transform has a filter that **excludes `node_modules`** — raw `.tsx` falls back to Bun's plain automatic JSX runtime, which evaluates `{expr}` children eagerly exactly once: the panel renders its mount-time snapshot (all zeros) and never updates, with no error anywhere. `scripts/build.ts` therefore pre-compiles with `babel-preset-solid` (`generate: "universal"`, `moduleName: "@opentui/solid"` — the same preset+options the host's own transform uses) and asserts the output is JSX-free and imports the `@opentui/solid` runtime. This matches how other working TUI plugins (e.g. `@slkiser/opencode-quota`) ship.
+- **Name the compile script `compile` in `package.json` (keep `build`, `prepare`, `prepack`, `preinstall`, `install`, and `postinstall` out of `scripts`).** OpenCode v2's `@opencode/Npm` service runs `pacote` inside the compiled single-file `opencode` binary (`process.execPath`), where `pacote`'s `GitFetcher` triggers `/$bunfs/bin/npm-cli.js install` whenever any of those six script keys exist, failing git installs (`github:...`) with `NpmInstallFailedError: git dep preparation failed`.
+- **Bare `@opentui/solid` / `solid-js` / `@opencode/plugin/tui` imports in `dist` are mapped to the host's instances at load time** by OpenCode's runtime resolver, so the compiled code shares the host's reactive runtime.
+- **`@opencode/plugin`, `@opentui/core`, `@opentui/solid`, `solid-js` are `peerDependencies` marked `optional: true` in `peerDependenciesMeta`** (with `devDependencies` mirrors for typecheck/test/compile). Keep the peer ranges aligned with the host (`@opentui/* >= 0.6.6`, `solid-js >= 1.9.0`) and keep them in `peerDependencies` rather than `dependencies` so the Solid/opentui runtime stays unified and `Arborist` skips downloading a redundant host tree during plugin install.
 - `src/timing.ts` has zero external imports (`scripts/build.ts` asserts `dist/timing.js` contains no `@opencode` references).
 
 ## Conventions
